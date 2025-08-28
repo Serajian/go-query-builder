@@ -8,7 +8,7 @@ func (qb *QueryBuilder) Where(column string, op Operator, value interface{}) *Qu
 		Value:  value,
 		Logic:  "AND",
 	}
-	qb.condition = append(qb.condition, condition)
+	qb.conditions = append(qb.conditions, condition)
 	return qb
 }
 
@@ -20,7 +20,7 @@ func (qb *QueryBuilder) OrWhere(column string, op Operator, value interface{}) *
 		Value:  value,
 		Logic:  "OR",
 	}
-	qb.condition = append(qb.condition, condition)
+	qb.conditions = append(qb.conditions, condition)
 	return qb
 }
 
