@@ -17,6 +17,7 @@ type QueryBuilder struct {
 	parameters []interface{}
 	phStyle    PlaceholderStyle
 	paramIndex int // for $1, $2, ...
+	returning  []string
 }
 
 // PlaceholderStyle controls how placeholders are rendered.

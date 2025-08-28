@@ -96,6 +96,15 @@ func (qb *QueryBuilder) Delete(table string) *QueryBuilder {
 	return qb
 }
 
+func (qb *QueryBuilder) Returning(columns ...string) *QueryBuilder {
+	if len(columns) == 0 {
+		qb.returning = []string{"*"}
+	} else {
+		qb.returning = columns
+	}
+	return qb
+}
+
 func (qb *QueryBuilder) Build() (string, []interface{}) {
 	qb.parameters = []interface{}{}
 	qb.paramIndex = 0 // reset placeholders
@@ -218,6 +227,10 @@ func (qb *QueryBuilder) buildInsert() (string, []interface{}) {
 		query.WriteString(") VALUES (")
 		query.WriteString(strings.Join(placeholders, ", "))
 		query.WriteString(")")
+		if len(qb.returning) > 0 {
+			query.WriteString(" RETURNING ")
+			query.WriteString(strings.Join(qb.returning, ", "))
+		}
 	}
 
 	return query.String(), qb.parameters
@@ -249,6 +262,10 @@ func (qb *QueryBuilder) buildUpdate() (string, []interface{}) {
 		query.WriteString(" WHERE ")
 		qb.buildConditions(&query, qb.conditions)
 	}
+	if len(qb.returning) > 0 {
+		query.WriteString(" RETURNING ")
+		query.WriteString(strings.Join(qb.returning, ", "))
+	}
 
 	return query.String(), qb.parameters
 }
@@ -264,7 +281,10 @@ func (qb *QueryBuilder) buildDelete() (string, []interface{}) {
 		query.WriteString(" WHERE ")
 		qb.buildConditions(&query, qb.conditions)
 	}
-
+	if len(qb.returning) > 0 {
+		query.WriteString(" RETURNING ")
+		query.WriteString(strings.Join(qb.returning, ", "))
+	}
 	return query.String(), qb.parameters
 }
 
