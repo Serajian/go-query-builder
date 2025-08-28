@@ -228,20 +228,6 @@ func TestInsertDefaultValues_Postgres(t *testing.T) {
 	}
 }
 
-func TestInsertDefaultValues_MySQL(t *testing.T) {
-	sql, args := NewQB().
-		WithPlaceholders(QuestionMark).
-		Insert("users").
-		Build()
-	want := "INSERT INTO users () VALUES ()"
-	if sql != want {
-		t.Fatalf("got: %s, want: %s", sql, want)
-	}
-	if len(args) != 0 {
-		t.Fatalf("want no args, got: %#v", args)
-	}
-}
-
 func TestQuestionMarkPlaceholdersSelect(t *testing.T) {
 	sql, args := NewQB().
 		WithPlaceholders(QuestionMark).
@@ -458,11 +444,181 @@ func TestUpdateReturning(t *testing.T) {
 		Returning("id").
 		Build()
 
-	want := "UPDATE users SET name = $1 RETURNING id"
+	want := "UPDATE users SET name = $1 WHERE 1=0 /*guarded: mising WHERE */ RETURNING id"
 	if sql != want {
 		t.Fatalf("sql mismatch:\n got: %s\nwant: %s", sql, want)
 	}
 	if len(args) != 1 || args[0] != "B" {
 		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestUpdateGuardedWithoutWhere_Default(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Update("users").
+		SetUpdate("role", "admin").
+		Build()
+
+	if !strings.Contains(sql, "WHERE 1=0") {
+		t.Fatalf("expected guard to add WHERE 1=0, got: %s", sql)
+	}
+	if len(args) != 1 || args[0] != "admin" {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestUpdateUnsafeWithoutWhere(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Update("users").
+		SetUpdate("role", "admin").
+		Unsafe().
+		Build()
+
+	if strings.Contains(sql, "WHERE 1=0") {
+		t.Fatalf("did not expect guard, got: %s", sql)
+	}
+	if !strings.HasPrefix(sql, "UPDATE users SET role = $1") {
+		t.Fatalf("unexpected sql: %s", sql)
+	}
+	if len(args) != 1 || args[0] != "admin" {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestDeleteGuardedWithoutWhere(t *testing.T) {
+	sql, _ := NewQB().
+		WithPlaceholders(DollarN).
+		Delete("users").
+		Build()
+
+	if !strings.Contains(sql, "DELETE FROM users WHERE 1=0") {
+		t.Fatalf("expected guarded delete, got: %s", sql)
+	}
+}
+
+func TestGuardResetsToSafeAfterBuild(t *testing.T) {
+	b := NewQB().WithPlaceholders(DollarN)
+
+	// First, disable guard for this build
+	sql1, _ := b.Update("users").SetUpdate("x", 1).Unsafe().Build()
+	if strings.Contains(sql1, "WHERE 1=0") {
+		t.Fatalf("unexpected guard on unsafe build: %s", sql1)
+	}
+
+	// Next build should be safe again (guard ON by default after Reset)
+	sql2, _ := b.Update("users").SetUpdate("x", 2).Build()
+	if !strings.Contains(sql2, "WHERE 1=0") {
+		t.Fatalf("expected guard to be ON after reset, got: %s", sql2)
+	}
+}
+
+func TestInsertOnConflictDoNothing_PG(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Insert("users").
+		Values(map[string]any{"id": 1, "name": "A"}).
+		OnConflict("id").
+		OnConflictDoNothing().
+		Build()
+
+	wantFrag := "ON CONFLICT (id) DO NOTHING"
+	if !strings.Contains(sql, wantFrag) {
+		t.Fatalf("expected %q in sql, got: %s", wantFrag, sql)
+	}
+	if len(args) != 2 || args[0] != 1 || args[1] != "A" {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestInsertOnConflictDoUpdate_PG_WithValuesAndExcluded(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Insert("users").
+		Values(map[string]any{"id": 1, "name": "A"}).
+		OnConflict("id").
+		OnConflictSet("age", 30).                // bind param → $3
+		OnConflictSet("name", Excluded("name")). // raw expr → excluded.name
+		Build()
+
+	// keys in update set are sorted: age, name
+	wantA := "ON CONFLICT (id) DO UPDATE SET age = $3, name = excluded.name"
+	if !strings.Contains(sql, wantA) {
+		t.Fatalf("expected %q in sql, got: %s", wantA, sql)
+	}
+
+	// params: [$1=id, $2=name, $3=age]
+	wantArgs := []any{1, "A", 30}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args mismatch:\n got: %#v\nwant: %#v", args, wantArgs)
+	}
+}
+
+func TestInsertOnConflictConstraint_PG(t *testing.T) {
+	sql, _ := NewQB().
+		WithPlaceholders(DollarN).
+		Insert("users").
+		Values(map[string]any{"id": 1}).
+		OnConflictConstraint("users_pkey").
+		OnConflictDoNothing().
+		Build()
+
+	want := "ON CONFLICT ON CONSTRAINT users_pkey DO NOTHING"
+	if !strings.Contains(sql, want) {
+		t.Fatalf("expected %q in sql, got: %s", want, sql)
+	}
+}
+
+func TestInsertDefaultValuesReturning_PG(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Insert("users").
+		Returning("id").
+		Build()
+
+	want := "INSERT INTO users DEFAULT VALUES RETURNING id"
+	if sql != want {
+		t.Fatalf("sql mismatch:\n got: %s\nwant: %s", sql, want)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected no args, got: %#v", args)
+	}
+}
+
+func TestInsertNoConflict_MySQL_NoReturning(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(QuestionMark).
+		Insert("users").
+		Values(map[string]any{"id": 1, "name": "A"}).
+		OnConflict("id").      // should be ignored on MySQL path
+		OnConflictDoNothing(). // should be ignored on MySQL path
+		Returning("id").       // MySQL generally doesn't support RETURNING
+		Build()
+
+	if strings.Contains(sql, "ON CONFLICT") || strings.Contains(sql, "RETURNING") {
+		t.Fatalf("did not expect ON CONFLICT/RETURNING for MySQL, got: %s", sql)
+	}
+	if !strings.Contains(sql, "VALUES (?, ?)") {
+		t.Fatalf("expected question mark placeholders, got: %s", sql)
+	}
+	wantArgs := []any{1, "A"}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args mismatch:\n got: %#v\nwant: %#v", args, wantArgs)
+	}
+}
+
+func TestInsertDefaultValues_MySQL(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(QuestionMark).
+		Insert("users").
+		Build()
+
+	want := "INSERT INTO users () VALUES ()"
+	if sql != want {
+		t.Fatalf("sql mismatch:\n got: %s\nwant: %s", sql, want)
+	}
+	if len(args) != 0 {
+		t.Fatalf("expected no args, got: %#v", args)
 	}
 }

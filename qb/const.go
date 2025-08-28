@@ -36,6 +36,19 @@ type QueryBuilder struct {
 	ParamIndex int
 	// ReturningColumns lists columns for RETURNING (PostgreSQL/SQLite 3.35+).
 	ReturningColumns []string
+	// GuardWrites, when true, protects UPDATE/ DELETE without WHERE
+	// rendering a safeguard: WHERE 1=0. Default is true; call Unsafe()
+	// to disable for a single query.
+	GuardWrites bool
+	// ConflictColumns lists target columns for ON CONFLICT (col1, col2, ...).
+	ConflictColumns []string
+	// ConflictConstraint sets ON CONSTRAINT <name> instead of a column list.
+	ConflictConstraint string
+	// ConflictDoNothing toggles ON CONFLICT ... DO NOTHING.
+	ConflictDoNothing bool
+	// ConflictUpdateSet maps columns to either a bound value or a RawExpr
+	// for ON CONFLICT ... DO UPDATE SET <col>=<value>.
+	ConflictUpdateSet map[string]interface{}
 }
 
 // PlaceholderStyle controls how placeholders are rendered.
@@ -131,3 +144,7 @@ type OrderBy struct {
 	Column string
 	Desc   bool
 }
+
+// RawExpr represents a raw SQL fragment that will be inlined as-is
+// (no placeholder binding). Use with care, e.g. Excluded("col").
+type RawExpr string

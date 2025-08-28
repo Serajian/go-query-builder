@@ -137,6 +137,16 @@ sqlStr, args := qb.NewQB().
 // INSERT INTO users (age, name) VALUES ($1, $2)
 // args: [30, "Alice"]
 
+// UPSERT (PostgreSQL/SQLite)
+sql, args := qb.NewQB().
+	WithPlaceholders(qb.DollarN).
+	Insert("users").
+	Values(map[string]any{"id": 1, "name": "A"}).
+	OnConflict("id").
+	OnConflictSet("name", qb.Excluded("name")). // use incoming value 
+	Returning("id").
+	Build()
+
 // UPDATE (keys are sorted → age, name)
 sqlStr, args = qb.NewQB().
 	WithPlaceholders(qb.DollarN).
@@ -148,6 +158,14 @@ sqlStr, args = qb.NewQB().
 	Build()
 // UPDATE users SET age = $1, name = $2 WHERE id = $3
 // args: [41, "Bob", 9]
+
+// Guarded write (safe by default)
+sql, _ := qb.NewQB().
+	WithPlaceholders(qb.DollarN).
+	Update("users").
+	SetUpdate("role", "admin").
+	Build()
+// UPDATE users SET role = $1 WHERE 1=0 /* guarded: missing WHERE */
 
 // DELETE + RETURNING *
 sqlStr, args = qb.NewQB().
