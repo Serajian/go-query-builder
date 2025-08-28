@@ -1,11 +1,12 @@
 package qb
 
-// GroupBy -> GROUP BY and HAVING
+// GroupBy appends columns to GROUP BY.
 func (qb *QueryBuilder) GroupBy(columns ...string) *QueryBuilder {
-	qb.groupBy = append(qb.groupBy, columns...)
+	qb.GroupByColumns = append(qb.GroupByColumns, columns...)
 	return qb
 }
 
+// Having adds a HAVING predicate (combined with AND by default).
 func (qb *QueryBuilder) Having(column string, op Operator, value interface{}) *QueryBuilder {
 	condition := Condition{
 		Column: column,
@@ -13,6 +14,6 @@ func (qb *QueryBuilder) Having(column string, op Operator, value interface{}) *Q
 		Value:  value,
 		Logic:  "AND",
 	}
-	qb.having = append(qb.having, condition)
+	qb.HavingConditions = append(qb.HavingConditions, condition)
 	return qb
 }
