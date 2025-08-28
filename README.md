@@ -13,6 +13,7 @@ Works with PostgreSQL (`$1,$2,...`) and MySQL/SQLite (`?`). You get a plain `sql
 
 - 🔁 **Pluggable placeholders:** `DollarN` (PostgreSQL, default) or `QuestionMark` (MySQL/SQLite).
 - 🧱 **Core statements:** `SELECT`, `INSERT`, `UPDATE`, `DELETE`.
+- 🔙 **`RETURNING` support** for `INSERT/UPDATE/DELETE` (PostgreSQL, SQLite ≥ 3.35).
 - 🔍 **Filters:** `WHERE`, `OR WHERE`, `IN/NOT IN`, `LIKE`, `IS NULL/IS NOT NULL`.
 - 🔗 **Joins:** `INNER`, `LEFT`, `RIGHT`.
 - 📊 **Grouping:** `GROUP BY` + `HAVING`.
@@ -131,6 +132,7 @@ sqlStr, args := qb.NewQB().
 	WithPlaceholders(qb.DollarN).
 	Insert("users").
 	Values(map[string]any{"name": "Alice", "age": 30}).
+	Returning("id").
 	Build()
 // INSERT INTO users (age, name) VALUES ($1, $2)
 // args: [30, "Alice"]
@@ -142,9 +144,20 @@ sqlStr, args = qb.NewQB().
 	SetUpdate("name", "Bob").
 	SetUpdate("age", 41).
 	Where("id", qb.EQ, 9).
+	Returning("id", "updated_at").
 	Build()
 // UPDATE users SET age = $1, name = $2 WHERE id = $3
 // args: [41, "Bob", 9]
+
+// DELETE + RETURNING *
+sqlStr, args = qb.NewQB().
+	WithPlaceholders(qb.DollarN).
+	Delete("sessions").
+	Where("user_id", qb.EQ, 42).
+	Returning("*").
+	Build()
+// DELETE FROM sessions WHERE user_id = $1 RETURNING *
+// args: [42]
 ```
 
 ---
@@ -161,6 +174,7 @@ sqlStr, args = qb.NewQB().
   - `Insert(table)`, `Values(map[string]any)`, `Set(col, val)`
   - `Update(table)`, `SetUpdate(col, val)`
   - `Delete(table)`
+  - `Returning(cols...) (works for INSERT/UPDATE/DELETE)`
   - `Build() (sql string, args []any)`
 
 - **Filters**
@@ -193,6 +207,11 @@ sqlStr, args = qb.NewQB().
 - **Reusable builder**
   - Starting a new query clears previous state; each `Build()` restarts the `$n` counter from 1.
 
+---
+🤝 Contributing
+
+PRs are welcome!
+Open an issue to discuss features like FullJoin, dialect helpers, etc.
 ---
 
 ## 📄 License
