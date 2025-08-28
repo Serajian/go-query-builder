@@ -2,6 +2,8 @@ package qb
 
 import (
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -15,11 +17,22 @@ func NewQB() *QueryBuilder {
 		having:     []Condition{},
 		orderBy:    []OrderBy{},
 		parameters: []interface{}{},
+		phStyle:    DollarN, // Default
+		paramIndex: 0,
 	}
+}
+
+// WithPlaceholders sets placeholder style: QuestionMark (?) or DollarN ($1..)
+func (qb *QueryBuilder) WithPlaceholders(style PlaceholderStyle) *QueryBuilder {
+	qb.phStyle = style
+	qb.paramIndex = 0
+	return qb
 }
 
 // Select is SELECT operations
 func (qb *QueryBuilder) Select(columns ...string) *QueryBuilder {
+	qb.Reset()
+
 	qb.queryType = SELECT
 	if len(columns) == 0 {
 		qb.columns = []string{"*"}
@@ -36,6 +49,8 @@ func (qb *QueryBuilder) From(table string) *QueryBuilder {
 
 // Insert is INSERT operations
 func (qb *QueryBuilder) Insert(table string) *QueryBuilder {
+	qb.Reset()
+
 	qb.queryType = INSERT
 	qb.table = table
 	qb.insertData = make(map[string]interface{})
@@ -57,6 +72,8 @@ func (qb *QueryBuilder) Set(column string, value interface{}) *QueryBuilder {
 
 // Update is UPDATE operations
 func (qb *QueryBuilder) Update(table string) *QueryBuilder {
+	qb.Reset()
+
 	qb.queryType = UPDATE
 	qb.table = table
 	qb.updateData = make(map[string]interface{})
@@ -72,6 +89,8 @@ func (qb *QueryBuilder) SetUpdate(column string, value interface{}) *QueryBuilde
 }
 
 func (qb *QueryBuilder) Delete(table string) *QueryBuilder {
+	qb.Reset()
+
 	qb.queryType = DELETE
 	qb.table = table
 	return qb
@@ -79,6 +98,7 @@ func (qb *QueryBuilder) Delete(table string) *QueryBuilder {
 
 func (qb *QueryBuilder) Build() (string, []interface{}) {
 	qb.parameters = []interface{}{}
+	qb.paramIndex = 0 // reset placeholders
 
 	switch qb.queryType {
 	case SELECT:
@@ -99,7 +119,12 @@ func (qb *QueryBuilder) Paginate(page, perPage int) *QueryBuilder {
 }
 
 func (qb *QueryBuilder) Reset() *QueryBuilder {
-	return NewQB()
+	style := qb.phStyle
+
+	newQB := QueryBuilder{phStyle: style}
+	*qb = newQB
+
+	return qb
 }
 
 func (qb *QueryBuilder) buildSelect() (string, []interface{}) {
@@ -149,9 +174,9 @@ func (qb *QueryBuilder) buildSelect() (string, []interface{}) {
 		orderParts := make([]string, len(qb.orderBy))
 		for i, order := range qb.orderBy {
 			if order.Desc {
-				orderParts[i] = order.Column + "DESC"
+				orderParts[i] = order.Column + " DESC"
 			} else {
-				orderParts[i] = order.Column + "ASC"
+				orderParts[i] = order.Column + " ASC"
 			}
 		}
 		query.WriteString(strings.Join(orderParts, ", "))
@@ -178,12 +203,14 @@ func (qb *QueryBuilder) buildInsert() (string, []interface{}) {
 
 	if len(qb.insertData) > 0 {
 		columns := make([]string, 0, len(qb.insertData))
-		placeholders := make([]string, 0, len(qb.insertData))
-
-		for column, value := range qb.insertData {
-			columns = append(columns, column)
-			placeholders = append(placeholders, "?")
-			qb.parameters = append(qb.parameters, value)
+		for col := range qb.insertData {
+			columns = append(columns, col)
+		}
+		sort.Strings(columns)
+		placeholders := make([]string, 0, len(columns))
+		for _, column := range columns {
+			placeholders = append(placeholders, qb.placeholder())
+			qb.parameters = append(qb.parameters, qb.insertData[column])
 		}
 
 		query.WriteString(" (")
@@ -203,10 +230,17 @@ func (qb *QueryBuilder) buildUpdate() (string, []interface{}) {
 	query.WriteString(qb.table)
 	query.WriteString(" SET ")
 
-	setParts := make([]string, 0, len(qb.updateData))
-	for column, value := range qb.updateData {
-		setParts = append(setParts, column+" = ?")
-		qb.parameters = append(qb.parameters, value)
+	// Stable order for update set clauses
+	keys := make([]string, 0, len(qb.updateData))
+	for k := range qb.updateData {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	setParts := make([]string, 0, len(keys))
+	for _, column := range keys {
+		setParts = append(setParts, column+" = "+qb.placeholder())
+		qb.parameters = append(qb.parameters, qb.updateData[column])
 	}
 	query.WriteString(strings.Join(setParts, ", "))
 
@@ -238,31 +272,80 @@ func (qb *QueryBuilder) buildConditions(query *strings.Builder, conditions []Con
 	for i, condition := range conditions {
 		if i > 0 {
 			query.WriteString(" ")
-			query.WriteString(condition.Logic)
+			query.WriteString(condition.Logic) // AND / OR
 			query.WriteString(" ")
 		}
 
-		query.WriteString(condition.Column)
-		query.WriteString(" ")
-		query.WriteString(string(condition.Op))
-
 		switch condition.Op {
 		case NULL, NOTNULL:
-			// No value needed
+			// col IS NULL / col IS NOT NULL
+			query.WriteString(condition.Column)
+			query.WriteString(" ")
+			query.WriteString(string(condition.Op))
+
 		case IN, NIN:
-			if values, ok := condition.Value.([]interface{}); ok {
-				placeholders := make([]string, len(values))
-				for j, value := range values {
-					placeholders[j] = "?"
-					qb.parameters = append(qb.parameters, value)
+			values, ok := sliceToInterfaces(condition.Value)
+			if !ok || len(values) == 0 {
+				if condition.Op == IN {
+					query.WriteString("(1=0)") // always false
+				} else {
+					query.WriteString("(1=1)") // always true
 				}
-				query.WriteString(" (")
-				query.WriteString(strings.Join(placeholders, ", "))
-				query.WriteString(")")
+				continue
 			}
+
+			query.WriteString(condition.Column)
+			query.WriteString(" ")
+			query.WriteString(string(condition.Op))
+			query.WriteString(" (")
+
+			phs := make([]string, len(values))
+			for j, v := range values {
+				phs[j] = qb.placeholder()
+				qb.parameters = append(qb.parameters, v)
+			}
+			query.WriteString(strings.Join(phs, ", "))
+			query.WriteString(")")
+
 		default:
-			query.WriteString(" ?")
+			//   (=, !=, >, >=, <, <=, LIKE, NOT LIKE, ...)
+			query.WriteString(condition.Column)
+			query.WriteString(" ")
+			query.WriteString(string(condition.Op))
+			query.WriteString(" ")
+			query.WriteString(qb.placeholder())
 			qb.parameters = append(qb.parameters, condition.Value)
 		}
 	}
+}
+
+// placeholder returns the next placeholder according to the configured style.
+func (qb *QueryBuilder) placeholder() string {
+	switch qb.phStyle {
+	case DollarN:
+		qb.paramIndex++
+		return fmt.Sprintf("$%d", qb.paramIndex)
+	default:
+		return "?"
+	}
+}
+
+// sliceToInterfaces converts any slice/array (except []byte) to []interface{}.
+// Returns (nil, false) if the input is not a slice/array.
+func sliceToInterfaces(v interface{}) ([]interface{}, bool) {
+	val := reflect.ValueOf(v)
+	k := val.Kind()
+	if k != reflect.Slice && k != reflect.Array {
+		return nil, false
+	}
+	// treat []byte separately to avoid exploding into bytes
+	if val.Type().Elem().Kind() == reflect.Uint8 {
+		// If user really meant []byte inside IN, it's unusual — return single element
+		return []interface{}{v}, true
+	}
+	out := make([]interface{}, val.Len())
+	for i := 0; i < val.Len(); i++ {
+		out[i] = val.Index(i).Interface()
+	}
+	return out, true
 }
