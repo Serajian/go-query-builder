@@ -1,10 +1,8 @@
 # qb — Tiny SQL Query Builder for Go
 
-[![Go CI](https://github.com/Serajian/query-builder-GO/actions/workflows/go.yml/badge.svg)](https://github.com/Serajian/query-builder-GO/actions/workflows/go.yml)
 ![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/Serajian/query-builder-GO.svg)](https://pkg.go.dev/github.com/Serajian/query-builder-GO)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
-[![Go Report Card](https://goreportcard.com/badge/github.com/Serajian/query-builder-GO)](https://goreportcard.com/report/github.com/Serajian/query-builder-GO)
 
 A lightweight, ergonomic Query Builder that produces **safe placeholder SQL** with **type-safe parameters**.  
 Works with PostgreSQL (`$1,$2,...`) and MySQL/SQLite (`?`). You get a plain `sql string` plus `[]any` params—perfect for `database/sql`, `sqlx`, `pgx`, etc.
