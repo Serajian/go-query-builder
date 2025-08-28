@@ -1,32 +1,34 @@
 package qb
 
-// Join -> JOIN operations
+// Join appends an INNER JOIN clause with the given ON condition.
 func (qb *QueryBuilder) Join(table string, condition string) *QueryBuilder {
 	join := Join{
 		Type:      INNER,
 		Table:     table,
 		Condition: condition,
 	}
-	qb.joins = append(qb.joins, join)
+	qb.Joins = append(qb.Joins, join)
 	return qb
 }
 
+// LeftJoin appends a LEFT JOIN clause with the given ON condition.
 func (qb *QueryBuilder) LeftJoin(table string, condition string) *QueryBuilder {
 	join := Join{
 		Type:      LEFT,
 		Table:     table,
 		Condition: condition,
 	}
-	qb.joins = append(qb.joins, join)
+	qb.Joins = append(qb.Joins, join)
 	return qb
 }
 
+// RightJoin appends a RIGHT JOIN clause with the given ON condition.
 func (qb *QueryBuilder) RightJoin(table string, condition string) *QueryBuilder {
 	join := Join{
 		Type:      RIGHT,
 		Table:     table,
 		Condition: condition,
 	}
-	qb.joins = append(qb.joins, join)
+	qb.Joins = append(qb.Joins, join)
 	return qb
 }
