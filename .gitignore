@@ -10,7 +10,7 @@
 *.a
 
 # Go executable files
-*_test.go
+#*_test.go
 
 # Vendor directory
 /vendor/
