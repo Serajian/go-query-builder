@@ -1,7 +1,7 @@
 package qb
 
 // Join appends an INNER JOIN clause with the given ON condition.
-func (qb *QueryBuilder) Join(table string, condition string) *QueryBuilder {
+func (qb *QueryBuilder) Join(table, condition string) *QueryBuilder {
 	join := Join{
 		Type:      INNER,
 		Table:     table,
@@ -12,7 +12,7 @@ func (qb *QueryBuilder) Join(table string, condition string) *QueryBuilder {
 }
 
 // LeftJoin appends a LEFT JOIN clause with the given ON condition.
-func (qb *QueryBuilder) LeftJoin(table string, condition string) *QueryBuilder {
+func (qb *QueryBuilder) LeftJoin(table, condition string) *QueryBuilder {
 	join := Join{
 		Type:      LEFT,
 		Table:     table,
@@ -23,7 +23,7 @@ func (qb *QueryBuilder) LeftJoin(table string, condition string) *QueryBuilder {
 }
 
 // RightJoin appends a RIGHT JOIN clause with the given ON condition.
-func (qb *QueryBuilder) RightJoin(table string, condition string) *QueryBuilder {
+func (qb *QueryBuilder) RightJoin(table, condition string) *QueryBuilder {
 	join := Join{
 		Type:      RIGHT,
 		Table:     table,

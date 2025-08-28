@@ -35,12 +35,12 @@ func (qb *QueryBuilder) WhereNotIn(column string, value interface{}) *QueryBuild
 }
 
 // WhereLike adds a LIKE predicate (value should include wildcards, e.g. %foo%).
-func (qb *QueryBuilder) WhereLike(column string, pattern string) *QueryBuilder {
+func (qb *QueryBuilder) WhereLike(column, pattern string) *QueryBuilder {
 	return qb.Where(column, LIKE, pattern)
 }
 
 // WhereNotLike adds a NOT LIKE predicate.
-func (qb *QueryBuilder) WhereNotLike(column string, pattern string) *QueryBuilder {
+func (qb *QueryBuilder) WhereNotLike(column, pattern string) *QueryBuilder {
 	return qb.Where(column, NOTLIKE, pattern)
 }
 
