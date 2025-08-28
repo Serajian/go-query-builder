@@ -15,7 +15,17 @@ type QueryBuilder struct {
 	insertData map[string]interface{}
 	updateData map[string]interface{}
 	parameters []interface{}
+	phStyle    PlaceholderStyle
+	paramIndex int // for $1, $2, ...
 }
+
+// PlaceholderStyle controls how placeholders are rendered.
+type PlaceholderStyle int
+
+const (
+	QuestionMark PlaceholderStyle = iota // ?, e.g. MySQL/sqlite
+	DollarN                              // $1, $2..., e.g. PostgreSQL
+)
 
 // QueryType represents different types of queries
 type QueryType int
