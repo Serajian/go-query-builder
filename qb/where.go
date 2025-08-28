@@ -24,6 +24,7 @@ func (qb *QueryBuilder) OrWhere(column string, op Operator, value interface{}) *
 	return qb
 }
 
+// WhereIn accepts any slice/array types (e.g., []int, []string, []uuid.UUID, ...).
 func (qb *QueryBuilder) WhereIn(column string, value interface{}) *QueryBuilder {
 	return qb.Where(column, IN, value)
 }
