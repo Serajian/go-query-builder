@@ -195,36 +195,6 @@ sqlStr, args = qb.NewQB().
 
 ---
 
-## 🧰 Testing
-
-```bash
-go test ./... -v -race -covermode=atomic -coverprofile=coverage.out
-go tool cover -func=coverage.out
-```
-
-### CI (GitHub Actions)
-
-Create the file **`.github/workflows/go.yml`**:
-
-```yaml
-name: Go CI
-on:
-  push:
-  pull_request:
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.x'
-      - run: go test ./... -v -race -covermode=atomic -coverprofile=coverage.out
-      - run: go tool cover -func=coverage.out
-```
-
----
-
 ## 📄 License
 
 [MIT License](LICENSE)
