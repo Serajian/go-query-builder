@@ -223,18 +223,6 @@ jobs:
       - run: go tool cover -func=coverage.out
 ```
 
-Add the CI badge at the top of this README:
-```md
-[![Go CI](https://github.com/Serajian/query-builder-GO/actions/workflows/go.yml/badge.svg)](https://github.com/Serajian/query-builder-GO/actions/workflows/go.yml)
-```
-
----
-
-## 🤝 Contributing
-
-PRs are welcome!  
-Open an issue to discuss features like `FullJoin`, `RETURNING`, dialect helpers, etc.
-
 ---
 
 ## 📄 License
