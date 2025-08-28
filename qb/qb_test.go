@@ -622,3 +622,108 @@ func TestInsertDefaultValues_MySQL(t *testing.T) {
 		t.Fatalf("expected no args, got: %#v", args)
 	}
 }
+
+func TestInsertSet_NilMapBranch(t *testing.T) {
+	b := NewQB().WithPlaceholders(DollarN).Insert("users")
+	b.InsertData = nil
+	sql, args := b.Set("name", "A").Build()
+	if !strings.Contains(sql, "INSERT INTO users (name) VALUES ($1)") {
+		t.Fatalf("unexpected sql: %s", sql)
+	}
+	if len(args) != 1 || args[0] != "A" {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestUpdateSetUpdate_NilMapBranch(t *testing.T) {
+	b := NewQB().WithPlaceholders(DollarN).Update("users")
+	b.UpdateData = nil
+	sql, args := b.SetUpdate("age", 30).Where("id", EQ, 1).Build()
+	if !strings.Contains(sql, "UPDATE users SET age = $1 WHERE id = $2") {
+		t.Fatalf("unexpected sql: %s", sql)
+	}
+	want := []any{30, 1}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestReturning_DefaultStar(t *testing.T) {
+	sql, _ := NewQB().
+		WithPlaceholders(DollarN).
+		Update("users").
+		SetUpdate("name", "B").
+		Returning(). // بدون آرگومان ⇒ *
+		Where("id", EQ, 2).
+		Build()
+	if !strings.HasSuffix(sql, " RETURNING *") {
+		t.Fatalf("expected RETURNING *; got: %s", sql)
+	}
+}
+
+func TestSafe_TogglesBackOn(t *testing.T) {
+	sql, _ := NewQB().
+		WithPlaceholders(DollarN).
+		Update("users").
+		SetUpdate("x", 1).
+		Unsafe().
+		Safe().
+		Build()
+	if !strings.Contains(sql, "WHERE 1=0") {
+		t.Fatalf("expected guard after Safe(), got: %s", sql)
+	}
+}
+
+func TestWhereNull_Coverage(t *testing.T) {
+	sql, _ := NewQB().
+		WithPlaceholders(DollarN).
+		Select("id").
+		From("t").
+		WhereNull("deleted_at").
+		Build()
+	if !strings.Contains(sql, "deleted_at IS NULL") {
+		t.Fatalf("expected IS NULL, got: %s", sql)
+	}
+}
+
+func TestOnConflictSetMap_Coverage(t *testing.T) {
+	sql, args := NewQB().
+		WithPlaceholders(DollarN).
+		Insert("users").
+		Values(map[string]any{"id": 1, "name": "A"}).
+		OnConflict("id").
+		OnConflictSetMap(map[string]any{
+			"age":  30,               // → placeholder
+			"name": Excluded("name"), // → raw expr
+		}).
+		Build()
+
+	wantFrag := "ON CONFLICT (id) DO UPDATE SET age = $3, name = excluded.name"
+	if !strings.Contains(sql, wantFrag) {
+		t.Fatalf("expected %q in sql, got: %s", wantFrag, sql)
+	}
+	wantArgs := []any{1, "A", 30}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args mismatch: %#v", args)
+	}
+}
+
+func TestBuild_UnknownQueryType_DefaultBranch(t *testing.T) {
+	b := NewQB().WithPlaceholders(DollarN)
+
+	b.QueryType = QueryType(255)
+
+	sql, args := b.Build()
+
+	if sql != "" {
+		t.Fatalf("expected empty SQL for unknown query type, got: %q", sql)
+	}
+	if args != nil {
+		t.Fatalf("expected nil args for unknown query type, got: %#v", args)
+	}
+
+	sql2, _ := b.Select("id").From("t").Where("x", EQ, 1).Build()
+	if sql2 == "" {
+		t.Fatalf("builder should still work after default Build() + Reset()")
+	}
+}
