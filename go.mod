@@ -1,3 +1,3 @@
-module github.com/Serajian/query-builder-GO
+module github.com/Serajian/go-query-builder
 
 go 1.25.0
