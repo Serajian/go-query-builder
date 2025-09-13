@@ -27,7 +27,7 @@ Works with PostgreSQL (`$1,$2,...`) and MySQL/SQLite (`?`). You get a plain `sql
 ## 📦 Installation
 
 ```bash
-go get github.com/Serajian/query-builder-GO@latest
+go get github.com/Serajian/go-query-builder@latest
 ```
 
 ---
